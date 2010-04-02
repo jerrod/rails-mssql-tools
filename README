@@ -1,0 +1,79 @@
+=== Tools for Microsoft Sql Server 2005 in Rails ===
+
+A set of tools and conventions for using mssql 2005 with Rails.
+
+=====================
+Author: Luke Wendling
+Created: 2007-10-09
+Updated: 2007-12-19
+Version: 0.0.2 beta
+=====================
+
+== Project home: http://code.google.com/p/rails-mssql-tools/
+
+== Installation
+
+ruby script/plugin install http://rails-mssql-tools.googlecode.com/svn/trunk/
+
+== Usage
+
+The objective of this plugin is to:
+
+1. implement a conventional method for migrating mssql procs, views, and triggers.
+2. for legacy mssql databases, resolve camel-cased attributes to Rails' conventional 
+	underscored names, allowing developers to refer to model object attributes in 
+	the conventional manner:
+	model.user_name vs. model.UserName (camel-case is a common naming convention 
+	in the MS dev community)
+	
+= Camel-case resolution assumptions
+	- the legacy db consistently uses camel-casing for column names (not a mix of 
+	camel-case and underscore)
+	
+= An example Rails migration file might now look like the following:
+
+class AddNewColumnsAndUpdateTriggers < ActiveRecord::Migration
+  def self.up
+  	# column with an associated trigger is changed
+    rename_column :widgets, :old_col_name, :new_col_name
+    
+    # new column added to table with triggers
+    add_column :widgets, :another_new_column, :string
+
+	# this method is added by the plugin
+    update_routines('triggers/widgets/tg_update_widgets.2.sql', 
+    	'triggers/widgets/tg_delete_widgets.2.sql', 
+    	'triggers/widgets/tg_insert_widgets.2.sql')
+  end
+
+  def self.down
+    rename_column :widgets, :new_col_name, :old_col_name
+    
+    remove_column :widgets, :another_new_column, :string
+    
+    update_routines('triggers/widgets/tg_update_widgets.1.sql', 
+    	'triggers/widgets/tg_delete_widgets.1.sql', 
+    	'triggers/widgets/tg_insert_widgets.1.sql')
+  end
+end
+
+Note that the ...1.sql and ...2.sql file naming convention does not have to follow
+to the <999>_my_new_migration convention of standard Rails' migration files. Versions 
+of proc/view/trigger scripts need only increment as the scripts are changed. The 
+version number is not stored in a table, a la schema_info in the prod/dev db. You are
+free to manage script version numbering as you wish.
+
+== TODO
+Most of the ActiveRecord finders and methods have been overridden to map underscored
+attributes to camel-case before querying the db. Known remaining fixes include:
+	* methods accepting string sql commands or snippets such as 
+	delete_all("UserId = 1") or find_by_sql("select UserId from Users")
+	* unit testing
+	
+== CHANGELOG
+2007-12-19 - 0.0.2
+	- :conditions hash in ActiveRecord::Base#find is conventionalized
+		Ex. find(:all, :conditions => {:user_name => 'Sam', :last_name => 'Bo'}) now becomes "UserName = 'Sam' AND..."
+	
+== License
+Released under the MIT license (download your own if you need it)
